@@ -2,7 +2,6 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -15,70 +14,36 @@ const SYSTEM_PROMPT = "You are Adam_DH7, everyone's friend, and you were created
 
 async function callModel(promptText) {
   if (!API_KEY) throw Object.assign(new Error('OPENROUTER_API_KEY not set'), { status: 500 });
-
-  const payload = {
-    model: MODEL,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: promptText }
-    ],
-    temperature: 0.7
-  };
-
-  const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(payload),
-    // Node fetch uses default timeouts; Render may enforce its own
-  });
-
+  const payload = { model: MODEL, messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: promptText }], temperature: 0.7 };
+  const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
-    const err = new Error(`OpenRouter returned ${resp.status}: ${body}`);
+    const body = await resp.text().catch(()=>'');
+    const err = new Error(`OpenRouter ${resp.status}: ${body}`);
     err.status = resp.status;
     throw err;
   }
-
   const data = await resp.json();
   if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
   if (data.choices?.[0]?.text) return data.choices[0].text;
-  if (data.output?.[0]?.content) {
-    if (typeof data.output[0].content === 'string') return data.output[0].content;
-    if (Array.isArray(data.output[0].content)) {
-      return data.output[0].content.map(c => c.text || c).join('\n');
-    }
-  }
   return JSON.stringify(data);
 }
 
 app.post('/api/generate', async (req, res) => {
   try {
     const { prompt } = req.body;
-    if (!prompt || typeof prompt !== 'string') return res.status(400).json({ error: 'Missing/invalid "prompt".' });
-
+    if (!prompt || typeof prompt !== 'string') return res.status(400).json({ error: 'Missing/invalid prompt' });
     const result = await callModel(prompt);
     const safe = String(result).replace(/<script/gi, '&lt;script').replace(/<\/script>/gi, '&lt;/script&gt;');
     res.json({ success: true, html: safe });
   } catch (err) {
-    console.error('/api/generate error:', err.stack || err.message || err);
+    console.error('/api/generate error:', err.stack||err.message||err);
     const status = (err.status && Number.isInteger(err.status)) ? err.status : 500;
-    res.status(status).json({ error: 'Internal server error while generating AI response.' });
+    res.status(status).json({ error: 'Internal server error' });
   }
 });
 
-// Serve static files from /public
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// Fallback: serve index.html if route not found (optional)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-// Port from Render or default 3000
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`TF-Chat server listening on port ${PORT}`);
-});
+app.listen(PORT, ()=> console.log(`TF-Chat listening ${PORT}`));
