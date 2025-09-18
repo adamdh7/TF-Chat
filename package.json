@@ -1,21 +1,15 @@
 {
-  "name": "tf-chat-vercel",
+  "name": "tf-chat",
   "version": "1.0.0",
-  "description": "TF-Chat déployé sur Vercel avec API OpenRouter",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js"
   },
-  "keywords": ["chat", "vercel", "openrouter", "ai", "haitian"],
-  "author": "TF",
-  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "axios": "^1.6.8",
-    "dotenv": "^16.3.1",
-    "next": "^14.2.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "express": "^4.18.2"
   }
 }
