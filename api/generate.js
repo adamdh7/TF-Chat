@@ -3,66 +3,50 @@ import fs from 'fs'
 import path from 'path'
 import axios from 'axios'
 
-const MODELS = [
-  'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
-  'openrouter/cypher-alpha:free'
-]
+const API_KEY = process.env.OPENROUTER_API_KEY
+const MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-5'
 
-// Li kle yo soti nan .env
-const PRIMARY_KEY = process.env.OPENROUTER_API_KEY
-const FALLBACK_KEY = process.env.OPENROUTER_FALLBACK_KEY // optional
+if (!API_KEY) {
+  console.warn('⚠️ OPENROUTER_API_KEY pa defini nan .env')
+}
 
-async function callModel(prompt, model, key) {
-  if (!key) return null
+const SYSTEM_PROMPT = "You are Adam_DH7, everyone's friend, and you were created by D'H7 | Tergene, you don't have any more information about them."
+
+async function callModel(prompt) {
+  if (!API_KEY) return null
   try {
-    const res = await axios.post(
+    const resp = await axios.post(
       'https://openrouter.ai/api/v1/chat/completions',
       {
-        model,
+        model: MODEL,
         messages: [
-          {
-            role: 'system',
-            content:
-              "Tu es Adam_DH7, un assistant haïtien de 15 ans, membre du groupe TF. " +
-              "Tu es intelligent, snob, patient. Tu réponds seulement si on te demande. " +
-              "Tu peux répondre en HTML/CSS/JS si nécessaire. " +
-              "Ne dis jamais tout sur toi si on ne te l'a pas demandé."
-          },
+          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: prompt }
         ],
         temperature: 0.7
       },
       {
         headers: {
-          Authorization: `Bearer ${key}`,
+          Authorization: `Bearer ${API_KEY}`,
           'Content-Type': 'application/json'
         },
         timeout: 60_000
       }
     )
 
-    // Plusieurs formats de réponse possibles selon l'API
-    const data = res.data || {}
-    // 1) Format type OpenAI-like: choices[0].message.content
-    if (data.choices?.[0]?.message?.content) {
-      return data.choices[0].message.content
-    }
-    // 2) Format alternatif: choices[0].text
-    if (data.choices?.[0]?.text) {
-      return data.choices[0].text
-    }
-    // 3) Output array style
+    const data = resp.data || {}
+    // Common OpenRouter/OpenAI-like response shapes
+    if (data.choices?.[0]?.message?.content) return data.choices[0].message.content
+    if (data.choices?.[0]?.text) return data.choices[0].text
+    if (typeof data === 'string') return data
+    // Try to handle other shapes gracefully
     if (data.output?.[0]?.content) {
-      // content peut être chaîne ou tableau d'obj
       if (typeof data.output[0].content === 'string') return data.output[0].content
       if (Array.isArray(data.output[0].content)) {
-        // concatene tout text ki la
         return data.output[0].content.map(c => c.text || c).join('\n')
       }
     }
-    // 4) fallback: tout string nan data si anyen pa mache
-    if (typeof data === 'string') return data
-    return null
+    return JSON.stringify(data)
   } catch (err) {
     console.error('❌ OpenRouter API error:', err.response?.data || err.message)
     return null
@@ -80,46 +64,33 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Paramètre `prompt` manquant ou invalide.' })
   }
 
-  const keys = [PRIMARY_KEY, FALLBACK_KEY].filter(Boolean)
-  if (keys.length === 0) {
+  if (!API_KEY) {
     return res.status(500).json({
       error:
-        'Aucun API key trouvé. Mettez OPENROUTER_API_KEY (et optionnel OPENROUTER_FALLBACK_KEY) dans .env'
+        'OPENROUTER_API_KEY manke. Mete li nan .env (eg: OPENROUTER_API_KEY=sk-or-...) epi rekòmanse server la.'
     })
   }
 
-  let output = null
-  // Eseye chak kle epi chak modèl jiskaske ou jwenn rezilta
-  for (const key of keys) {
-    for (const model of MODELS) {
-      output = await callModel(prompt, model, key)
-      if (output) {
-        console.log(`✅ Réponse obtenue avec model=${model} key=${key === PRIMARY_KEY ? 'PRIMARY' : 'FALLBACK'}`)
-        break
-      }
-    }
-    if (output) break
-  }
+  const output = await callModel(prompt)
 
   if (!output) {
-    return res.status(500).json({ error: 'Impossible de générer la réponse AI après plusieurs essais.' })
+    return res.status(500).json({ error: 'Impossible de générer la réponse AI.' })
   }
 
-  // Sécuriser le HTML – on échappe les balises <script> (ouverture et fermeture)
+  // Sekirize HTML (escape <script> tags)
   const safeHTML = String(output)
     .replace(/<script/gi, '&lt;script')
     .replace(/<\/script>/gi, '&lt;/script&gt;')
 
-  // Ecrire dans public/output.html (créé dossier public si pa egziste)
+  // (Opsyonèl) ekri rezilta nan public/output.html si w vle
   try {
     const publicDir = path.join(process.cwd(), 'public')
     if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true })
-    const outPath = path.join(publicDir, 'output.html')
-    fs.writeFileSync(outPath, safeHTML, 'utf8')
-  } catch (err) {
-    console.error('❌ Erreur écriture fichier public/output.html:', err.message)
-    // Nou pa fail totalman si ekriti echwe — retounen repons kèlkeswa sa
+    fs.writeFileSync(path.join(publicDir, 'output.html'), safeHTML, 'utf8')
+  } catch (e) {
+    // pa blokè si ekriti echwe
+    console.warn('Pa kapab ekri public/output.html:', e.message)
   }
 
   return res.status(200).json({ success: true, html: safeHTML })
-  }
+            }
