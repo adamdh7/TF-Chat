@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WhatsApp Channel</title>
+<style>
+  body {
+    background-color: #000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    transition: all 0.3s;
+  }
+  .light-mode {
+    background-color: #fff;
+    color: #000;
+  }
+  header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  button {
+    padding: 10px 20px;
+    font-size: 16px;
+    margin: 10px 0;
+    cursor: pointer;
+  }
+  .channel-content {
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>WhatsApp Channel Preview</h1>
+  <button id="toggleMode">2-Click Light Mode</button>
+</header>
+
+<div class="channel-content">
+  <h2>Tit Channel</h2>
+  <p>Deskripsyon oswa detay sou sa ki nan channel lan...</p>
+  <!-- Ou ka ajoute plis eleman tankou lis posts oswa mini thumbnails si ou gen yo -->
+</div>
+
+<button onclick="window.open('https://whatsapp.com/channel/0029Vb6WLps7oQhWrUlyPQ2m', '_blank')">
+  Wè Chèn lan
+</button>
+
+<script>
+  let clickCount = 0;
+  const toggleBtn = document.getElementById('toggleMode');
+  toggleBtn.addEventListener('click', () => {
+    clickCount++;
+    if (clickCount >= 2) {
+      document.body.classList.toggle('light-mode');
+      clickCount = 0;
+    }
+  });
+</script>
+</body>
+  </html>
